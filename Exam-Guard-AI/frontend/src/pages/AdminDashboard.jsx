@@ -1,0 +1,10 @@
+import { useEffect, useState } from 'react';
+import api, { errorMessage, getData } from '../services/api.js';
+import { Alert, Badge, ButtonLink, Loading, PageHeader, StatCard } from '../components/UI.jsx';
+
+export default function AdminDashboard() {
+  const [data, setData] = useState(null); const [error, setError] = useState('');
+  useEffect(() => { api.get('/admin/dashboard').then((response) => setData(getData(response))).catch((requestError) => setError(errorMessage(requestError))); }, []);
+  if (!data && !error) return <Loading />;
+  return <><PageHeader eyebrow="SYSTEM OVERVIEW" title="Platform at a glance." description="A compact view of registered accounts, assessments and recent activity." action={<ButtonLink to="/admin/exams">Manage subjects & questions →</ButtonLink>} />{error && <Alert>{error}</Alert>}{data && <><div className="stats-grid four-cols"><StatCard label="Students" value={data.students} note="Registered accounts" icon="◉" /><StatCard label="Teachers" value={data.teachers} note="Faculty accounts" tone="burgundy" icon="♙" /><StatCard label="Total exams" value={data.exams} note="Across the platform" tone="amber" icon="▤" /><StatCard label="Recorded events" value={data.monitoring_events} note={`${data.attempts} exam attempts`} tone="sage" icon="⚑" /></div><section className="panel table-panel"><div className="panel-heading"><div><p className="eyebrow">SYSTEM ACTIVITY</p><h2>Recent monitoring events</h2></div><Badge>{data.recent.length} latest</Badge></div>{data.recent.length ? <div className="table-scroll"><table><thead><tr><th>EVENT</th><th>STUDENT</th><th>EXAM</th><th>WHEN</th></tr></thead><tbody>{data.recent.map((event, index) => <tr key={`${event.created_at}-${index}`}><td><strong>{event.event_type.replaceAll('_', ' ')}</strong><small>{event.description}</small></td><td>{event.student_name}</td><td>{event.exam_title}</td><td>{new Date(String(event.created_at).replace(' ', 'T') + 'Z').toLocaleString()}</td></tr>)}</tbody></table></div> : <div className="form-empty-note">Activity will appear here as students use the platform.</div>}</section></>}</>;
+}

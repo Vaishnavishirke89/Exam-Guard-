@@ -1,0 +1,106 @@
+CREATE DATABASE IF NOT EXISTS exam_guard_ai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE exam_guard_ai;
+
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('STUDENT','TEACHER','ADMIN') NOT NULL DEFAULT 'STUDENT',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_users_role (role)
+);
+
+CREATE TABLE IF NOT EXISTS student_profiles (
+  user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  roll_number VARCHAR(80) NOT NULL,
+  course VARCHAR(120) NOT NULL,
+  year_of_study TINYINT UNSIGNED NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_student_profiles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS exams (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  teacher_id BIGINT UNSIGNED NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  description TEXT,
+  subject VARCHAR(120) NOT NULL,
+  duration_minutes INT UNSIGNED NOT NULL,
+  total_marks DECIMAL(8,2) NOT NULL DEFAULT 0,
+  starts_at DATETIME NULL,
+  ends_at DATETIME NULL,
+  status ENUM('DRAFT','PUBLISHED','CLOSED') NOT NULL DEFAULT 'DRAFT',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_exams_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_exams_status_dates (status, starts_at, ends_at),
+  INDEX idx_exams_teacher (teacher_id)
+);
+
+CREATE TABLE IF NOT EXISTS questions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  exam_id BIGINT UNSIGNED NOT NULL,
+  question_text TEXT NOT NULL,
+  question_type ENUM('MCQ','DESCRIPTIVE') NOT NULL,
+  options_json JSON NULL,
+  correct_answer VARCHAR(500) NULL,
+  marks DECIMAL(8,2) NOT NULL DEFAULT 1,
+  position INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_questions_exam FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE,
+  INDEX idx_questions_exam_position (exam_id, position)
+);
+
+CREATE TABLE IF NOT EXISTS exam_attempts (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  exam_id BIGINT UNSIGNED NOT NULL,
+  student_id BIGINT UNSIGNED NOT NULL,
+  status ENUM('IN_PROGRESS','SUBMITTED','TIMED_OUT') NOT NULL DEFAULT 'IN_PROGRESS',
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  submitted_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_attempts_exam FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attempts_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_attempt_student_exam (student_id, exam_id),
+  INDEX idx_attempts_exam_status (exam_id, status),
+  INDEX idx_attempts_student (student_id)
+);
+
+CREATE TABLE IF NOT EXISTS answers (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  attempt_id BIGINT UNSIGNED NOT NULL,
+  question_id BIGINT UNSIGNED NOT NULL,
+  answer_text LONGTEXT,
+  metrics_json JSON NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_answers_attempt FOREIGN KEY (attempt_id) REFERENCES exam_attempts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_answers_question FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_answer_attempt_question (attempt_id, question_id)
+);
+
+CREATE TABLE IF NOT EXISTS monitoring_events (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  attempt_id BIGINT UNSIGNED NOT NULL,
+  question_id BIGINT UNSIGNED NULL,
+  event_type VARCHAR(48) NOT NULL,
+  description VARCHAR(500) NOT NULL,
+  severity ENUM('LOW','MEDIUM','HIGH') NOT NULL DEFAULT 'LOW',
+  details_json JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_events_attempt FOREIGN KEY (attempt_id) REFERENCES exam_attempts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_events_question FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE SET NULL,
+  INDEX idx_events_attempt_time (attempt_id, created_at),
+  INDEX idx_events_type (event_type)
+);
+
+CREATE TABLE IF NOT EXISTS suspicion_scores (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  attempt_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  suspicion_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  ai_likelihood TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  similarity_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  reasons_json JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_scores_attempt FOREIGN KEY (attempt_id) REFERENCES exam_attempts(id) ON DELETE CASCADE
+);
