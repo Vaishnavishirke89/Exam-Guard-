@@ -1,4 +1,7 @@
 import express from 'express';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import examRoutes from './routes/exams.js';
@@ -17,6 +20,12 @@ app.use('/api/exams', examRoutes);
 app.use('/api/attempts', attemptRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/admin', adminRoutes);
+// In production the built React app (frontend/dist) is served by this same server.
+const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+if (fs.existsSync(path.join(distDir, 'index.html'))) {
+  app.use(express.static(distDir));
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
+}
 app.use((_req, res) => res.status(404).json({ success: false, message: 'The requested page was not found.' }));
 app.use((error, _req, res, _next) => {
   if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ success: false, message: 'This record already exists.' });

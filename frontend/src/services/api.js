@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api', timeout: 12000 });
+const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5001/api'), timeout: 12000 });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('exam_guard_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;

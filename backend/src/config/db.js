@@ -10,7 +10,9 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   dateStrings: true,
   timezone: 'Z',
-  charset: 'utf8mb4'
+  charset: 'utf8mb4',
+  // Azure Database for MySQL requires TLS; set DB_SSL=true there.
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : undefined
 });
 
 export default pool;
